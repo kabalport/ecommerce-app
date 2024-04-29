@@ -1,0 +1,142 @@
+buildscript {
+	ext {
+		queryDslVersion = "5.0.0"
+	}
+}
+
+plugins {
+	id 'java'
+	id 'org.springframework.boot' version '3.1.11'
+	id 'io.spring.dependency-management' version '1.1.4'
+
+	id 'jacoco'
+	id 'org.sonarqube' version '4.0.0.2929'
+}
+
+group = 'com.example'
+version = '0.0.1-SNAPSHOT'
+
+java {
+	sourceCompatibility = '17'
+}
+
+repositories {
+	mavenCentral()
+}
+
+dependencies {
+	implementation 'org.springframework.boot:spring-boot-starter'
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+
+	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+	implementation "com.querydsl:querydsl-jpa:${queryDslVersion}:jakarta"
+	implementation 'org.springframework.boot:spring-boot-starter-web'
+	implementation 'com.google.guava:guava:31.1-jre'
+	testImplementation 'io.rest-assured:rest-assured:5.1.1'
+	//guava
+	implementation group: 'com.google.guava', name: 'guava', version: '32.1.1-jre'
+	//rest-doc
+	testImplementation 'org.springframework.restdocs:spring-restdocs-mockmvc'
+	//swagger
+	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.2.0'
+	//test
+	testImplementation "org.mockito:mockito-core:3.+"
+	//devtool
+	developmentOnly 'org.springframework.boot:spring-boot-devtools'
+	//model mapper
+	implementation 'org.modelmapper:modelmapper:3.1.1'
+
+	compileOnly 'org.projectlombok:lombok'
+
+	annotationProcessor 'org.projectlombok:lombok'
+	testImplementation 'io.rest-assured:rest-assured:5.3.2'
+
+	// 데이터베이스
+	runtimeOnly 'com.h2database:h2'
+	runtimeOnly 'org.postgresql:postgresql'
+	//테스크컨테이너
+	testImplementation "org.testcontainers:testcontainers:1.19.7"
+	testImplementation "org.testcontainers:postgresql:1.19.7"
+	testImplementation "org.testcontainers:junit-jupiter:1.19.7"
+
+	// 정적코드테스트
+	testImplementation 'com.tngtech.archunit:archunit:1.1.0'
+	implementation group: 'com.approvaltests', name: 'approvaltests', version: '23.0.0'
+}
+
+
+tasks.named('bootBuildImage') {
+	builder = 'paketobuildpacks/builder-jammy-base:latest'
+}
+
+tasks.named('test') {
+	// Define snippetsDir as a directory within the build directory
+	def snippetsDir = file("$buildDir/generated-snippets")
+
+	outputs.dir snippetsDir
+	useJUnitPlatform()
+
+	doFirst {
+		// Ensure the directory exists before the tests run
+		snippetsDir.mkdirs()
+	}
+
+	jacoco {}
+	finalizedBy(tasks.jacocoTestReport)
+}
+
+tasks.jacocoTestReport {
+	reports {
+		xml.required = true
+		html.required = true
+		csv.required = false
+
+		xml.destination(file("build/jacoco/jacoco.xml"))
+		html.destination(file("build/jacoco/jacoco.html"))
+	}
+
+	finalizedBy(tasks.jacocoTestCoverageVerification)
+}
+
+tasks.jacocoTestCoverageVerification {
+	violationRules {
+		rule {
+			enabled = true
+			element = "CLASS"
+
+			limit {
+				counter = "LINE"
+				value = "COVEREDRATIO"
+				minimum = BigDecimal.valueOf(BigDecimal.ZERO)
+			}
+
+			limit {
+				counter = "LINE"
+				value = "TOTALCOUNT"
+				maximum = BigDecimal.valueOf(100)
+			}
+
+			excludes = List.of(
+					"*.controller.*",
+					"*.api.*",
+					"*.infrastructure.*",
+					"net.dodoinfo.sbserver.SbserverApplication"
+			)
+		}
+	}
+}
+
+sonar {
+	properties {
+		property("sonar.host.url", "http://localhost:9000")
+		property("sonar.login", "sqp_0f3ac7b7184e54f344b1f342a1b584ac5717ace2")
+		property("sonar.sources", "src/main/java")
+		property("sonar.tests", "src/test/java")
+		property("sonar.sourceEncoding", "UTF-8")
+		property("sonar.projectKey", "sbserver")
+		property("sonar.projectName", "sbserver")
+		property("sonar.coverage.jacoco.xmlReportPaths", "build/jacoco/jacoco.xml")
+	}
+}
+
+compileJava.dependsOn('clean')
